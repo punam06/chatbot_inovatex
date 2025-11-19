@@ -1,0 +1,29 @@
+{
+  "name": "innovatex-food-management-db",
+  "version": "1.0.0",
+  "description": "Database layer for INNOVATEX Hackathon - Food Management System",
+  "main": "index.js",
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "node prisma/seed.js",
+    "prisma:studio": "prisma studio",
+    "db:push": "prisma db push",
+    "db:reset": "prisma migrate reset --force"
+  },
+  "keywords": [
+    "prisma",
+    "mysql",
+    "food-management",
+    "hackathon"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@prisma/client": "^5.8.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "prisma": "^5.8.0"
+  }
+}

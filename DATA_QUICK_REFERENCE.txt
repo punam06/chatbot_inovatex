@@ -1,0 +1,359 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║              DATA INVENTORY QUICK REFERENCE CARD                           ║
+║                    For Feature Implementation                              ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+📌 DATABASE: bubt_hackathon_db (utf8mb4, InnoDB, ACID compliant)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🗂️  TABLES SUMMARY (5 CORE)
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ TABLE 1: USERS                                                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Records: 1 (vegetarian.user@example.com)                               │
+│ PK: id (BIGINT AUTO_INCREMENT)                                          │
+│ Key Fields:                                                              │
+│   • email (VARCHAR 255, UNIQUE) — Login identifier                      │
+│   • password_hash (VARCHAR 255) — Hashed with bcrypt in production     │
+│   • full_name (VARCHAR 255) — Display name                              │
+│   • household_size (INT, default=1) — People count                      │
+│   • dietary_preferences (JSON) — ["Vegetarian", "Gluten-Free"]         │
+│   • location (VARCHAR 255) — Address/city                               │
+│   • created_at, updated_at (DATETIME auto) — Timestamps                 │
+│                                                                          │
+│ Indexes: email (UNIQUE), created_at                                     │
+│ Relations: → inventory (1:N CASCADE), → consumption_logs (1:N CASCADE)  │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ TABLE 2: FOOD_ITEMS (Master Catalog - Pre-loaded)                      │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Records: 8                                                               │
+│                                                                          │
+│ FOOD ITEMS LIST:                                                        │
+│  1. Milk (Dairy) - 7 days - $3.50/liter                                │
+│  2. Rice (Grains) - 365 days - $2.00/kg                                │
+│  3. Eggs (Protein) - 21 days - $4.50/dozen                             │
+│  4. Spinach (Vegetables) - 5 days - $1.50/bunch                        │
+│  5. Apples (Fruits) - 14 days - $0.80/piece                            │
+│  6. Bread (Grains) - 3 days - $2.50/loaf                               │
+│  7. Chicken Breast (Protein) - 2 days - $8.00/kg                       │
+│  8. Tomato (Vegetables) - 7 days - $1.20/piece                         │
+│                                                                          │
+│ Key Fields:                                                              │
+│   • name (VARCHAR 255, UNIQUE) — Canonical food name                   │
+│   • category (VARCHAR 100) — Dairy, Grains, Vegetables, Fruits, Protein│
+│   • default_expiration_days (INT) — Shelf life                         │
+│   • average_cost (DECIMAL 10,2) — Typical cost                         │
+│   • unit (VARCHAR 50) — kg, liter, piece, dozen, bunch, loaf           │
+│                                                                          │
+│ Indexes: name (UNIQUE), category                                        │
+│ Relations: ← inventory (N:1 SET NULL)                                   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ TABLE 3: INVENTORY (User's Food Items - Dynamic)                       │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Records: 4 (sample items for test user)                                │
+│                                                                          │
+│ SAMPLE ITEMS:                                                           │
+│  1. Full Cream Milk - 2.0 liters - expires 2025-11-24                 │
+│  2. Fresh Spinach Bunch - 1.0 bunch - expires 2025-11-23               │
+│  3. Whole Wheat Bread - 1.0 loaf - expires 2025-11-21                 │
+│  4. Red Apples - 5.0 pieces - expires 2025-11-28                       │
+│                                                                          │
+│ Key Fields:                                                              │
+│   • user_id (BIGINT FK→users CASCADE) — Owner                          │
+│   • food_item_id (BIGINT FK→food_items SET NULL) — Link to master     │
+│   • custom_name (VARCHAR 255) — "Organic Milk", user's label           │
+│   • quantity (DECIMAL 10,2) — Current amount                           │
+│   • unit (VARCHAR 50) — Unit of measurement                            │
+│   • purchase_date (DATE) — When bought ⭐                               │
+│   • expiration_date (DATE) — When expires ⭐ INDEXED                    │
+│   • source_image_url (VARCHAR 2048) — Receipt/food image               │
+│   • ai_metadata (JSON) — {brand, ripeness, quality, allergens, storage}│
+│   • created_at, updated_at (DATETIME) — Timestamps                     │
+│                                                                          │
+│ Indexes: user_id ⚡, expiration_date ⚡, food_item_id ⚡, purchase_date ⚡│
+│ Relations: → users (N:1), → food_items (N:1)                           │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ TABLE 4: CONSUMPTION_LOGS (Audit Trail - Training Data)                │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Records: 5 (sample actions for test user)                              │
+│                                                                          │
+│ SAMPLE LOGS:                                                            │
+│  1. Spinach - PURCHASED - 1.00 - 2025-11-18                            │
+│  2. Milk - PURCHASED - 2.00 - 2025-11-17                               │
+│  3. Spinach - CONSUMED - 0.50 - 2025-11-18                             │
+│  4. Apples - WASTED - 1.00 - "Got bruised" - 2025-11-16                │
+│  5. Bread - PURCHASED - 1.00 - 2025-11-19                              │
+│                                                                          │
+│ Key Fields:                                                              │
+│   • user_id (BIGINT FK→users CASCADE) — Who                            │
+│   • food_name (VARCHAR 255) — Snapshot of name at time                 │
+│   • action_type (ENUM) — PURCHASED, CONSUMED, WASTED, DONATED         │
+│   • quantity (DECIMAL 10,2) — Amount involved                          │
+│   • reason_for_waste (TEXT) — Why wasted? (optional)                   │
+│   • log_date (DATETIME, auto NOW()) — When action occurred             │
+│                                                                          │
+│ Indexes: user_id ⚡, log_date ⚡, action_type ⚡, (user_id, log_date) ⚡│
+│ Relations: → users (N:1)                                                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ TABLE 5: RESOURCES (Educational Content - Pre-loaded)                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Records: 6                                                               │
+│                                                                          │
+│ RESOURCES:                                                              │
+│  1. "How to Store Vegetables Properly" (TIP) - Storage Tips            │
+│  2. "Understanding Expiration Dates" (ARTICLE) - Food Safety           │
+│  3. "Creative Ways to Use Leftover Vegetables" (VIDEO) - Recipe Ideas  │
+│  4. "Meal Planning to Reduce Waste" (ARTICLE) - Meal Planning          │
+│  5. "Freezing Guide for Common Foods" (TIP) - Food Preservation        │
+│  6. "Composting at Home" (ARTICLE) - Sustainability                    │
+│                                                                          │
+│ Key Fields:                                                              │
+│   • title (VARCHAR 255) — Resource title                               │
+│   • content (LONGTEXT) — Full content (markdown OK)                    │
+│   • category_tag (VARCHAR 100) — Storage, Recipes, Sustainability     │
+│   • resource_type (ENUM) — TIP, ARTICLE, VIDEO                        │
+│   • created_at, updated_at (DATETIME) — Timestamps                     │
+│                                                                          │
+│ Indexes: category_tag ⚡, resource_type ⚡                               │
+│ Relations: None (standalone)                                            │
+└─────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔗 RELATIONSHIPS DIAGRAM
+
+  users (1)
+    │
+    ├──→ (N) inventory ──→ (?) food_items
+    │        └── [JSON] ai_metadata
+    │
+    └──→ (N) consumption_logs
+             └── [ENUM] action_type
+
+  resources (standalone)
+
+  Cascade Rules:
+    users → inventory: ON DELETE CASCADE
+    users → consumption_logs: ON DELETE CASCADE
+    food_items ← inventory: ON DELETE SET NULL
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📋 ENUMS (Validation)
+
+  action_type (consumption_logs):
+    ✓ PURCHASED     (item bought)
+    ✓ CONSUMED      (item eaten)
+    ✓ WASTED        (item discarded - reason recommended)
+    ✓ DONATED       (item given away)
+
+  resource_type (resources):
+    ✓ TIP           (quick actionable tip, 100-300 words)
+    ✓ ARTICLE       (long-form content, 1000+ words)
+    ✓ VIDEO         (video tutorial)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+👀 VIEWS (Pre-built Queries)
+
+  VIEW 1: user_consumption_summary
+  ─────────────────────────────────
+  Columns:
+    • user_id, email, full_name
+    • total_purchased, total_consumed, total_wasted, total_donated
+    • total_waste_qty (sum of wasted quantities)
+    • last_log_date
+  
+  Use for: Dashboard stats, user analytics, sustainability reports
+
+  VIEW 2: expiring_inventory
+  ─────────────────────────
+  Columns:
+    • id, user_id, email
+    • item_name, food_item_name
+    • quantity, unit, expiration_date
+    • days_until_expiry (calculated)
+  
+  Filter: WHERE expiration_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+  Use for: Expiration alerts, push notifications, email reminders
+
+═══════════════════════════════════════════════════════════════════════════════
+
+💾 DATA TYPES (When Creating New Fields)
+
+  Quantities & Costs:     DECIMAL(10,2)       — No floating-point errors
+  IDs & Counts:          BIGINT UNSIGNED     — Supports 18+ billion records
+  Dates:                 DATE                — YYYY-MM-DD
+  Timestamps:            DATETIME            — YYYY-MM-DD HH:MM:SS
+  Names & Categories:    VARCHAR(255)        — 255 character text
+  Long Content:          LONGTEXT            — 4GB text (markdown, HTML)
+  URLs:                  VARCHAR(2048)       — 2KB URLs
+  Flexible Data:         JSON                — Structured data
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⚠️  NOT NULL vs NULLABLE
+
+  REQUIRED (NOT NULL):
+    users: id, email, password_hash, household_size
+    food_items: id, name
+    inventory: id, user_id, quantity
+    consumption_logs: id, user_id, action_type, quantity
+    resources: id, title, resource_type
+
+  OPTIONAL (NULLABLE):
+    users: full_name, dietary_preferences, location
+    food_items: category, default_expiration_days, average_cost, unit
+    inventory: food_item_id, custom_name, unit, purchase_date, expiration_date, 
+               source_image_url, ai_metadata
+    consumption_logs: food_name, reason_for_waste
+    resources: category_tag, content
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔑 UNIQUE CONSTRAINTS (Only one per value)
+
+  users.email              — Each email registers once
+  food_items.name          — Each food item is unique
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⚡ INDEXES (Use in WHERE clauses for speed)
+
+  users:               email (UNIQUE), created_at
+  food_items:          name (UNIQUE), category
+  inventory:           user_id ⭐, expiration_date ⭐, food_item_id, purchase_date
+  consumption_logs:    user_id ⭐, log_date ⭐, action_type, (user_id, log_date)
+  resources:           category_tag, resource_type
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 COMMON QUERIES (Copy & Use)
+
+  -- Get user stats
+  SELECT * FROM user_consumption_summary WHERE user_id = ?;
+
+  -- Get expiring items
+  SELECT * FROM expiring_inventory WHERE user_id = ? ORDER BY days_until_expiry;
+
+  -- Get user inventory
+  SELECT i.*, f.category, f.default_expiration_days
+  FROM inventory i
+  LEFT JOIN food_items f ON i.food_item_id = f.id
+  WHERE i.user_id = ?
+  ORDER BY i.expiration_date ASC;
+
+  -- Log an action
+  INSERT INTO consumption_logs (user_id, food_name, action_type, quantity, reason_for_waste)
+  VALUES (?, ?, ?, ?, ?);
+
+  -- Get waste statistics
+  SELECT action_type, COUNT(*) as count, SUM(quantity) as total
+  FROM consumption_logs
+  WHERE user_id = ?
+  GROUP BY action_type;
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📱 API ENDPOINT TEMPLATE
+
+  Authentication:
+    POST   /api/auth/register        → Create user
+    POST   /api/auth/login           → Authenticate
+    POST   /api/auth/logout          → Sign out
+
+  User Profile:
+    GET    /api/users/:id            → Get user
+    PUT    /api/users/:id            → Update profile
+    DELETE /api/users/:id            → Delete (cascades)
+
+  Inventory:
+    GET    /api/inventory            → List user's items
+    POST   /api/inventory            → Add item
+    PUT    /api/inventory/:id        → Update item
+    DELETE /api/inventory/:id        → Remove item
+
+  Consumption:
+    POST   /api/consumption/log      → Log action (purchase/consume/waste)
+    GET    /api/consumption/history  → Get logs
+    GET    /api/consumption/stats    → Get aggregated stats
+
+  Alerts:
+    GET    /api/alerts/expiring      → Get expiring items (7 days)
+    GET    /api/alerts/waste-summary → Get waste statistics
+
+  Resources:
+    GET    /api/resources            → List all resources
+    GET    /api/resources?type=TIP   → Filter by type
+    GET    /api/resources?category=Storage → Filter by category
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ BEFORE IMPLEMENTING FEATURES
+
+  □ Read DATA_INVENTORY.md (detailed version)
+  □ Understand the 5 tables and their purposes
+  □ Know the enums (action_type, resource_type)
+  □ Use correct data types (DECIMAL, DATETIME, JSON, ENUM)
+  □ Respect foreign keys and cascade rules
+  □ Query using indexed columns (user_id, expiration_date)
+  □ Validate NOT NULL fields before INSERT
+  □ Handle NULLABLE fields as optional
+  □ Use views for aggregated data (don't recalculate)
+  □ Preserve consumption_logs (never delete history)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📊 DATA STATISTICS
+
+  Total Tables:          5 core + 2 views
+  Total Records:         16 (1 user + 8 foods + 4 inventory + 5 logs + 6 resources)
+  Total Indexes:         10+
+  Total Columns:         42+
+  Total JSON Fields:     2 (dietary_preferences, ai_metadata)
+  Total Enums:           2 (action_type, resource_type)
+  Foreign Keys:          4
+  Cascade Relations:     2 (users → inventory, users → consumption_logs)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔐 SECURITY REMINDERS
+
+  ✗ Never send password_hash to frontend
+  ✗ Never expose api_metadata without authorization
+  ✗ Always validate user_id matches authenticated user
+  ✗ Never allow negative quantities
+  ✗ Always hash passwords before INSERT
+  ✗ Never commit .env with credentials
+  ✗ Use prepared statements to prevent SQL injection
+  ✓ Validate email format before INSERT
+  ✓ Validate enum values (only PURCHASED, CONSUMED, WASTED, DONATED)
+  ✓ Validate dates are logical (expiration > purchase)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📞 QUICK REFERENCE LINKS
+
+  Detailed Docs:        DATA_INVENTORY.md (this project)
+  Schema Definition:    prisma/schema.prisma or sql/core_schema.sql
+  Sample Data:          sql/seed_data.sql
+  Validation Script:    sql/smoke_test.sql
+  Setup Guide:          sql/SETUP.md
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Status: ✅ Ready for Feature Development
+
+Generated: November 2025
+Version: 1.0
+

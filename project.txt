@@ -1,0 +1,60 @@
+
+1
+
+Automatic Zoom
+INNOVATEX Hackathon Project Brief – Part 1  
+(Pre-Hack Requirements) 
+ 
+SDG 2 & SDG 12: AI-Powered Food Management & Sustainability Platform 
+ 
+Context 
+This document contains the pre-hack (Part 1) requirements for the hackathon 
+project. Part 2 (onsite challenges and AI requirements) will be revealed on the 
+hackathon day. 
+Theme & Problem 
+Many individuals and communities face challenges with food waste, inefficient 
+consumption, and limited access to nutritious meals on a budget. Your solution 
+should support SDG 2: Zero Hunger, by improving food security and nutrition, and 
+SDG 12: Responsible Consumption and Production, by reducing waste and 
+promoting sustainable practices through mindful food tracking and planning. 
+High-Level Concept 
+Build a full-stack web application where users (individuals, families, or 
+community groups) can create profiles, log food usage, manage inventories, and 
+access basic tools for tracking consumption. In Part 1, focus on a solid 
+foundation: authentication, profiles, data models, image upload for future 
+scanning, and simple (non-AI) logging and reporting. 
+General Technical Guidelines 
+You can pick any technology or tech stacks. 
+o  Full-stack web app using any modern stack. 
+o  Persistent database for users, food logs, inventories, and resources. 
+o  Clean, responsive, and usable UI. 
+o  Deployed or easily runnable locally with clear instructions. 
+PART 1 – REQUIRED FEATURES (TO BE COMPLETED BEFORE ONSITE) 
+1. Authentication & User Management 
+o  Implement user registration and login (email/password or similar 
+secure method). 
+o  Basic validation (e.g., required fields, invalid email format, 
+password length). 
+o  Store at minimum: 
+▪  Full name 
+▪  Email 
+▪  Household size or dietary preferences (e.g., vegetarian, 
+budget range) 
+▪  Location (for future local features) 
+2. User Profile & Consumption Logging 
+o  Create a Profile page for each user. 
+o  Users must be able to: 
+▪  Add or edit basic details like budget preferences and dietary 
+needs. 
+▪  Log daily food usage manually (e.g., item name, quantity, 
+category like vegetable/dairy). 
+▪  Manage a simple inventory list (add/remove items with 
+quantities and dates). 
+o  Additionally: 
+▪  Provide a simple way to note or store consumption history 
+(no AI/processing required in Part 1; just store this data). 
+3. Food Items & Inventory Database (Seeded Data) 
+o  Create and seed a food items/inventory collection or table. 
+o  Each item entry should include at least: 
+▪  Item name 
+▪  Category (e.g., fruit, dairy, grain) 
