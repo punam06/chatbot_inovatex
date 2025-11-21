@@ -32,33 +32,66 @@ async function parseBody(req) {
 async function getAIResponse(message, preferences = {}) {
   try {
     if (!genAI) {
-      return "Hello! I'm NourishAI, your food waste reduction assistant. How can I help you today?";
+      console.error("❌ Gemini not initialized");
+      return generateFallbackResponse(message, preferences);
     }
     
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const systemPrompt = `You are NourishAI, a friendly and helpful food waste reduction chatbot. 
-You specialize in:
-- Meal planning and recipes
-- Food storage tips
-- Reducing food waste
-- Sustainable living
-- Budget-friendly cooking
-- Dietary preferences and allergies
+    const systemPrompt = `You are NourishAI, a friendly and helpful food waste reduction chatbot specializing in reducing food waste.
 
-User preferences: ${JSON.stringify(preferences)}
+User Context:
+- Budget: ${preferences.budget || 'moderate'}
+- Family Size: ${preferences.familySize || 1}
+- Dietary Preferences: ${preferences.dietaryPreferences ? preferences.dietaryPreferences.join(', ') : 'none'}
+- Allergies: ${preferences.allergies ? preferences.allergies.join(', ') : 'none'}
 
-Respond helpfully and conversationally in 2-3 sentences. Be specific and actionable.`;
+Your expertise:
+- Meal planning and recipes based on their budget and preferences
+- Food storage tips to extend shelf life
+- Reducing food waste strategies
+- Sustainable living tips
+- Budget-friendly cooking techniques
+- Managing dietary preferences and allergies
 
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: message }] }],
-      systemInstruction: systemPrompt,
-    });
+Respond helpfully and conversationally in 2-3 sentences. Be specific and actionable. Consider their preferences.`;
 
-    return result.response.text() || "I'm here to help! What would you like to know?";
+    const prompt = `${systemPrompt}\n\nUser question: ${message}`;
+    
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    
+    if (!text || text.trim().length === 0) {
+      return generateFallbackResponse(message, preferences);
+    }
+    
+    return text;
   } catch (e) {
-    console.error("AI Error:", e.message);
-    return "I'm here to help reduce food waste. Could you rephrase your question?";
+    console.error("❌ AI Error:", e.message);
+    return generateFallbackResponse(message, preferences);
   }
+}
+
+// Generate contextual fallback responses
+function generateFallbackResponse(message, preferences = {}) {
+  const msg = message.toLowerCase();
+  
+  if (msg.includes('recipe') || msg.includes('meal') || msg.includes('cook')) {
+    return `I'd be happy to help with recipes! For a family of ${preferences.familySize || 1} with a ${preferences.budget || 'moderate'} budget, I recommend planning meals that maximize ingredient use. What type of cuisine or ingredients are you interested in?`;
+  }
+  
+  if (msg.includes('waste') || msg.includes('save') || msg.includes('reduce')) {
+    return `Great question about reducing food waste! The best strategies include: proper food storage, meal planning, composting, and using leftovers creatively. What specific area would you like tips on?`;
+  }
+  
+  if (msg.includes('allerg') || msg.includes('diet')) {
+    return `I understand dietary needs are important! With your preferences (${preferences.dietaryPreferences?.join(', ') || 'standard'}), I can suggest meals and alternatives. What would you like to cook?`;
+  }
+  
+  if (msg.includes('budget') || msg.includes('cheap') || msg.includes('afford')) {
+    return `Budget-friendly cooking is my specialty! Focus on seasonal produce, bulk items, and versatile ingredients. What meals are you planning for your family of ${preferences.familySize || 1}?`;
+  }
+  
+  return `I'm NourishAI, your food waste reduction assistant! I can help with meal planning, recipes, storage tips, and sustainable living. What would you like to know?`;
 }
 
 module.exports = async (req, res) => {
