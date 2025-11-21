@@ -54,41 +54,37 @@ async function getAIResponse(message, preferences = {}) {
       return generateFallbackResponse(message, preferences);
     }
     
-    const systemPrompt = `You are NourishAI, a friendly and helpful food waste reduction chatbot specializing in reducing food waste.
+    const systemPrompt = `You are NourishAI, a friendly and helpful food waste reduction chatbot.
 
-User Context:
+Context:
 - Budget: ${preferences.budget || 'moderate'}
 - Family Size: ${preferences.familySize || 1}
-- Dietary Preferences: ${preferences.dietaryPreferences ? preferences.dietaryPreferences.join(', ') : 'none'}
-- Allergies: ${preferences.allergies ? preferences.allergies.join(', ') : 'none'}
+- Dietary: ${preferences.dietaryPreferences?.join(', ') || 'none'}
+- Allergies: ${preferences.allergies?.join(', ') || 'none'}
 
-Your expertise:
-- Meal planning and recipes based on their budget and preferences
-- Food storage tips to extend shelf life
-- Reducing food waste strategies
-- Sustainable living tips
-- Budget-friendly cooking techniques
-- Managing dietary preferences and allergies
+Expertise: meal planning, recipes, food storage, waste reduction, sustainability, budget cooking.
+Respond in 2-3 sentences. Be specific and actionable.`;
 
-Respond helpfully and conversationally in 2-3 sentences. Be specific and actionable. Consider their preferences.`;
-
-    const prompt = `${systemPrompt}\n\nUser question: ${message}`;
+    const fullPrompt = `${systemPrompt}\n\nUser: ${message}`;
     
-    console.log("🔄 Calling Gemini API...");
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    // Call Gemini with a reasonable timeout approach
+    const responsePromise = model.generateContent(fullPrompt);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Gemini timeout")), 25000)
+    );
     
-    console.log("✅ Gemini response received");
+    const result = await Promise.race([responsePromise, timeoutPromise]);
+    const text = result.response?.text?.() || result.response?.text || "";
     
     if (!text || text.trim().length === 0) {
       console.warn("⚠️ Empty Gemini response");
       return generateFallbackResponse(message, preferences);
     }
     
+    console.log("✅ Gemini response ok");
     return text;
   } catch (e) {
-    console.error("❌ AI Error:", e.message);
-    console.error("Stack:", e.stack);
+    console.error("❌ Gemini error:", e.message);
     return generateFallbackResponse(message, preferences);
   }
 }
@@ -253,7 +249,13 @@ module.exports = async (req, res) => {
       }
 
       // Get AI response
-      const aiResponse = await getAIResponse(message, preferences || users[userId].user.preferences);
+      let aiResponse;
+      try {
+        aiResponse = await getAIResponse(message, preferences || users[userId].user.preferences);
+      } catch (aiError) {
+        console.error("Chat error:", aiError);
+        aiResponse = generateFallbackResponse(message, preferences || users[userId].user.preferences);
+      }
 
       // Store in conversation history
       users[userId].user.conversations.push({
