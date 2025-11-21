@@ -15,21 +15,26 @@ const USER_DATA_DIR = path.join(__dirname, "../data/users");
 // Flag to track if file system is available
 let fileSystemAvailable = false;
 
-// Try to ensure data directory exists (may fail on Vercel, that's ok)
-// Wrap everything in try-catch to prevent crashes
-try {
-  // First check if directory exists
-  if (fs.existsSync && typeof fs.existsSync === 'function') {
-    if (!fs.existsSync(USER_DATA_DIR)) {
-      if (fs.mkdirSync && typeof fs.mkdirSync === 'function') {
-        fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+// Only initialize file system if not on serverless
+const isServerless = process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
+
+if (!isServerless) {
+  try {
+    // First check if directory exists
+    if (fs.existsSync && typeof fs.existsSync === "function") {
+      if (!fs.existsSync(USER_DATA_DIR)) {
+        if (fs.mkdirSync && typeof fs.mkdirSync === "function") {
+          fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+        }
       }
+      fileSystemAvailable = true;
     }
-    fileSystemAvailable = true;
+  } catch (e) {
+    console.log(`⚠️ File system initialization error: ${e.message}`);
+    fileSystemAvailable = false;
   }
-} catch (e) {
-  console.log(`⚠️ File system initialization error: ${e.message}`);
-  console.log("Using in-memory storage only");
+} else {
+  console.log("⚠️ Running on serverless platform - using in-memory storage only");
   fileSystemAvailable = false;
 }
 
