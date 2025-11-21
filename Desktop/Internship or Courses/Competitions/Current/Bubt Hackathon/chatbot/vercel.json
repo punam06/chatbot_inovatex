@@ -11,5 +11,9 @@
       "src": "/(.*)",
       "dest": "/api/index.js"
     }
-  ]
+  ],
+  "public": true,
+  "env": {
+    "VERCEL_URL": "@vercel_url"
+  }
 }
