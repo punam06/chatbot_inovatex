@@ -6,7 +6,14 @@
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-require("dotenv").config();
+
+// Load environment safely
+try {
+  require("dotenv").config();
+} catch (e) {
+  console.log("⚠️ dotenv not available");
+}
+
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Initialize Gemini API
@@ -18,37 +25,57 @@ let prisma = null;
 try {
   prisma = require("@prisma/client").PrismaClient && new (require("@prisma/client").PrismaClient)();
 } catch (e) {
-  console.log("⚠️ Prisma not available, using in-memory storage only");
+  console.log("⚠️ Prisma not available");
   prisma = null;
 }
 
-// Import services
-const UserManager = require("./services/userManager");
-const PromptChainBuilder = require("./services/promptChainBuilder");
-const bangladeshFoodDatabase = require("./services/bangladeshFoodDatabase");
-const {
-  getUserContext,
-  buildSystemPrompt,
-  detectIntent,
-  buildUserMessage,
-} = require("./services/chatbotService");
-const {
-  calculateWasteMetrics,
-  calculateSDGScore,
-  formatMetricsForDisplay,
-  generateCompleteSDGProfile,
-  calculateNutritionScore,
-} = require("./services/analyticsService");
-const {
-  generateMealPlan,
-  generateWeeklyMealPlan,
-  getRecipeDetails,
-  getRecipesByIngredient,
-} = require("./services/mealPlanningService");
-const {
-  processImageForInventory,
-  batchProcessImages,
-} = require("./services/visionService");
+// Import services with error handling
+let UserManager, PromptChainBuilder, bangladeshFoodDatabase;
+let chatbotService = {}, analyticsService = {}, mealPlanningService = {}, visionService = {};
+
+try {
+  UserManager = require("./services/userManager");
+} catch (e) {
+  console.log("⚠️ UserManager failed:", e.message);
+  UserManager = { getUserData: () => ({ statistics: {}, preferences: {} }) };
+}
+
+try {
+  PromptChainBuilder = require("./services/promptChainBuilder");
+} catch (e) {
+  console.log("⚠️ PromptChainBuilder failed:", e.message);
+}
+
+try {
+  bangladeshFoodDatabase = require("./services/bangladeshFoodDatabase");
+} catch (e) {
+  console.log("⚠️ bangladeshFoodDatabase failed:", e.message);
+  bangladeshFoodDatabase = {};
+}
+
+try {
+  chatbotService = require("./services/chatbotService");
+} catch (e) {
+  console.log("⚠️ chatbotService failed:", e.message);
+}
+
+try {
+  analyticsService = require("./services/analyticsService");
+} catch (e) {
+  console.log("⚠️ analyticsService failed:", e.message);
+}
+
+try {
+  mealPlanningService = require("./services/mealPlanningService");
+} catch (e) {
+  console.log("⚠️ mealPlanningService failed:", e.message);
+}
+
+try {
+  visionService = require("./services/visionService");
+} catch (e) {
+  console.log("⚠️ visionService failed:", e.message);
+}
 
 // Initialize Express
 const app = express();
