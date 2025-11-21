@@ -1,35 +1,66 @@
 const fs = require("fs");
 const path = require("path");
 
-// Gemini AI Setup
 let genAI = null;
 try {
   const { GoogleGenerativeAI } = require("@google/generative-ai");
   const apiKey = process.env.GEMINI_API_KEY || "AIzaSyDaB12Xx2tqyV2g0VcKZlwx1_EvZM52y8g";
   genAI = new GoogleGenerativeAI(apiKey);
 } catch (e) {
-  console.log("Gemini not available");
+  console.log("⚠️ Gemini not available");
 }
 
-// In-memory storage
 const users = {};
 let htmlCache = null;
 
-// Helper: Generate AI response
-async function getAIResponse(message) {
+// Parse body safely
+async function parseBody(req) {
+  return new Promise((resolve) => {
+    let body = "";
+    req.on("data", chunk => (body += chunk));
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(body));
+      } catch (e) {
+        resolve(req.body || {});
+      }
+    });
+  });
+}
+
+// Get AI response with proper error handling
+async function getAIResponse(message, preferences = {}) {
   try {
-    if (!genAI) return "Hello from NourishAI! How can I help you reduce food waste?";
+    if (!genAI) {
+      return "Hello! I'm NourishAI, your food waste reduction assistant. How can I help you today?";
+    }
+    
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const result = await model.generateContent(
-      `You are NourishAI, a friendly food waste reduction chatbot focused on sustainability and meal planning. User: "${message}". Respond helpfully in 1-2 sentences.`
-    );
-    return result.response.text();
+    const systemPrompt = `You are NourishAI, a friendly and helpful food waste reduction chatbot. 
+You specialize in:
+- Meal planning and recipes
+- Food storage tips
+- Reducing food waste
+- Sustainable living
+- Budget-friendly cooking
+- Dietary preferences and allergies
+
+User preferences: ${JSON.stringify(preferences)}
+
+Respond helpfully and conversationally in 2-3 sentences. Be specific and actionable.`;
+
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: message }] }],
+      systemInstruction: systemPrompt,
+    });
+
+    return result.response.text() || "I'm here to help! What would you like to know?";
   } catch (e) {
-    return "Thanks for your message! I'm here to help reduce food waste. What specific help do you need?";
+    console.error("AI Error:", e.message);
+    return "I'm here to help reduce food waste. Could you rephrase your question?";
   }
 }
 
-// Main handler
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
@@ -55,120 +86,170 @@ module.exports = async (req, res) => {
 
     // Serve CSS
     if (pathname.endsWith(".css")) {
-      const cssPath = path.join(process.cwd(), "public", pathname);
-      const css = fs.readFileSync(cssPath, "utf-8");
-      res.setHeader("Content-Type", "text/css");
-      return res.status(200).send(css);
+      try {
+        const cssPath = path.join(process.cwd(), "public", pathname);
+        const css = fs.readFileSync(cssPath, "utf-8");
+        res.setHeader("Content-Type", "text/css");
+        return res.status(200).send(css);
+      } catch (e) {
+        return res.status(404).json({ error: "CSS not found" });
+      }
     }
 
     // Serve JS
     if (pathname.endsWith(".js")) {
-      const jsPath = path.join(process.cwd(), "public", pathname);
-      const js = fs.readFileSync(jsPath, "utf-8");
-      res.setHeader("Content-Type", "application/javascript");
-      return res.status(200).send(js);
+      try {
+        const jsPath = path.join(process.cwd(), "public", pathname);
+        const js = fs.readFileSync(jsPath, "utf-8");
+        res.setHeader("Content-Type", "application/javascript");
+        return res.status(200).send(js);
+      } catch (e) {
+        return res.status(404).json({ error: "JS not found" });
+      }
     }
 
-    // API: Health
+    // Health check
     if (pathname === "/health") {
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, status: "running" });
     }
 
-    // API: Chat - WITH AI
-    if (pathname === "/api/chat" && req.method === "POST") {
-      let body = "";
-      req.on("data", chunk => body += chunk);
-      req.on("end", async () => {
-        try {
-          const data = JSON.parse(body);
-          const { userId, message } = data;
-          
-          if (!userId || !message) {
-            return res.status(400).json({ error: "Missing userId or message" });
-          }
+    // CREATE USER
+    if (pathname === "/api/user/create" && req.method === "POST") {
+      const body = await parseBody(req);
+      const { userId, budget, familySize, dietaryPreferences, allergies } = body;
 
-          // Create user if needed
-          if (!users[userId]) {
-            users[userId] = {
-              id: userId,
-              conversations: [],
-              preferences: {}
-            };
-          }
+      if (!userId) {
+        return res.status(400).json({ success: false, error: "Missing userId" });
+      }
 
-          // Get AI response
-          const aiResponse = await getAIResponse(message);
+      users[userId] = {
+        userId,
+        user: {
+          id: userId,
+          preferences: {
+            budget: budget || "moderate",
+            familySize: familySize || 1,
+            dietaryPreferences: dietaryPreferences || [],
+            allergies: allergies || [],
+          },
+          conversations: [],
+        },
+      };
 
-          // Store conversation
-          users[userId].conversations.push({
-            user: message,
-            bot: aiResponse,
-            timestamp: new Date()
-          });
-
-          res.status(200).json({
-            success: true,
-            message: aiResponse,
-            userId
-          });
-        } catch (e) {
-          res.status(500).json({ error: e.message });
-        }
+      return res.status(200).json({
+        success: true,
+        user: users[userId].user,
       });
-      return;
     }
 
-    // API: User GET
+    // GET USER
     if (pathname.match(/^\/api\/user\/[^/]+$/) && req.method === "GET") {
       const userId = pathname.split("/api/user/")[1];
+
       if (!users[userId]) {
         users[userId] = {
-          id: userId,
-          conversations: [],
-          preferences: { language: "English", budget: "moderate" }
+          userId,
+          user: {
+            id: userId,
+            preferences: {
+              budget: "moderate",
+              familySize: 1,
+              dietaryPreferences: [],
+              allergies: [],
+            },
+            conversations: [],
+          },
         };
       }
-      return res.status(200).json(users[userId]);
-    }
 
-    // API: User POST (update preferences)
-    if (pathname.match(/^\/api\/user\/[^/]+$/) && req.method === "POST") {
-      const userId = pathname.split("/api/user/")[1];
-      let body = "";
-      req.on("data", chunk => body += chunk);
-      req.on("end", () => {
-        const data = JSON.parse(body);
-        if (!users[userId]) users[userId] = { id: userId };
-        users[userId].preferences = { ...users[userId].preferences, ...data };
-        res.status(200).json(users[userId]);
+      return res.status(200).json({
+        success: true,
+        user: users[userId].user,
       });
-      return;
     }
 
-    // API: Inventory GET
+    // CHAT - PRIMARY ENDPOINT FOR AI RESPONSES
+    if (pathname === "/api/chat" && req.method === "POST") {
+      const body = await parseBody(req);
+      const { userId, message, preferences } = body;
+
+      if (!userId || !message) {
+        return res.status(400).json({
+          success: false,
+          error: "Missing userId or message",
+        });
+      }
+
+      // Ensure user exists
+      if (!users[userId]) {
+        users[userId] = {
+          userId,
+          user: {
+            id: userId,
+            preferences: preferences || {
+              budget: "moderate",
+              familySize: 1,
+              dietaryPreferences: [],
+              allergies: [],
+            },
+            conversations: [],
+          },
+        };
+      }
+
+      // Get AI response
+      const aiResponse = await getAIResponse(message, preferences || users[userId].user.preferences);
+
+      // Store in conversation history
+      users[userId].user.conversations.push({
+        user: message,
+        bot: aiResponse,
+        timestamp: new Date().toISOString(),
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: aiResponse,
+        userId,
+      });
+    }
+
+    // INVENTORY GET
     if (pathname.includes("/inventory") && req.method === "GET") {
-      return res.status(200).json({ inventory: [], success: true });
+      return res.status(200).json({
+        success: true,
+        inventory: [],
+      });
     }
 
-    // API: Inventory POST
+    // INVENTORY POST
     if (pathname.includes("/inventory") && req.method === "POST") {
-      return res.status(200).json({ success: true, message: "Item added" });
+      return res.status(200).json({
+        success: true,
+        message: "Item added successfully",
+      });
     }
 
-    // API: Analytics
+    // ANALYTICS
     if (pathname.includes("/analytics")) {
       return res.status(200).json({
+        success: true,
         sdgScore: 50,
         wasteReduced: 0,
         messagesCount: 0,
-        success: true
       });
     }
 
-    // Default
-    res.status(404).json({ error: "Endpoint not found" });
+    // 404
+    res.status(404).json({
+      success: false,
+      error: "Endpoint not found",
+    });
   } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({ error: error.message });
+    console.error("❌ Server Error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Server error",
+    });
   }
 };
