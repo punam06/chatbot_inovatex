@@ -2,13 +2,31 @@ const fs = require("fs");
 const path = require("path");
 
 let genAI = null;
-try {
-  const { GoogleGenerativeAI } = require("@google/generative-ai");
-  const apiKey = process.env.GEMINI_API_KEY || "AIzaSyDaB12Xx2tqyV2g0VcKZlwx1_EvZM52y8g";
-  genAI = new GoogleGenerativeAI(apiKey);
-} catch (e) {
-  console.log("⚠️ Gemini not available");
+let model = null;
+
+// Initialize Gemini AI
+async function initializeGemini() {
+  try {
+    const { GoogleGenerativeAI } = require("@google/generative-ai");
+    const apiKey = process.env.GEMINI_API_KEY || "AIzaSyDaB12Xx2tqyV2g0VcKZlwx1_EvZM52y8g";
+    
+    if (!apiKey) {
+      console.error("❌ No Gemini API key found");
+      return false;
+    }
+    
+    genAI = new GoogleGenerativeAI(apiKey);
+    model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    console.log("✅ Gemini AI initialized");
+    return true;
+  } catch (e) {
+    console.error("❌ Gemini initialization error:", e.message);
+    return false;
+  }
 }
+
+// Initialize on startup
+initializeGemini();
 
 const users = {};
 let htmlCache = null;
@@ -31,12 +49,11 @@ async function parseBody(req) {
 // Get AI response with proper error handling
 async function getAIResponse(message, preferences = {}) {
   try {
-    if (!genAI) {
-      console.error("❌ Gemini not initialized");
+    if (!model || !genAI) {
+      console.warn("⚠️ Gemini not available, using fallback");
       return generateFallbackResponse(message, preferences);
     }
     
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const systemPrompt = `You are NourishAI, a friendly and helpful food waste reduction chatbot specializing in reducing food waste.
 
 User Context:
@@ -57,16 +74,21 @@ Respond helpfully and conversationally in 2-3 sentences. Be specific and actiona
 
     const prompt = `${systemPrompt}\n\nUser question: ${message}`;
     
+    console.log("🔄 Calling Gemini API...");
     const result = await model.generateContent(prompt);
     const text = result.response.text();
     
+    console.log("✅ Gemini response received");
+    
     if (!text || text.trim().length === 0) {
+      console.warn("⚠️ Empty Gemini response");
       return generateFallbackResponse(message, preferences);
     }
     
     return text;
   } catch (e) {
     console.error("❌ AI Error:", e.message);
+    console.error("Stack:", e.stack);
     return generateFallbackResponse(message, preferences);
   }
 }
