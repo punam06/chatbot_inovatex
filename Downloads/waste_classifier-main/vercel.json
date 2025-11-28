@@ -1,6 +1,12 @@
 {
   "buildCommand": "pip install -r requirements.txt",
   "outputDirectory": ".",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api"
+    }
+  ],
   "env": {
     "PYTHONUNBUFFERED": "1"
   },

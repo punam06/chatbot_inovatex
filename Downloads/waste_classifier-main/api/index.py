@@ -1,21 +1,22 @@
 import os
 import sys
-import django
-from django.conf import settings
-from django.core.wsgi import get_wsgi_application
-from django.http import HttpResponse
+from pathlib import Path
 
-# Add the project directory to the path
-project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, project_dir)
+# Add the parent directory to the path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Setup Django
+# Setup Django before importing anything else
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'wasteclassifier.settings')
+
+import django
 django.setup()
 
-# Get WSGI application
-application = get_wsgi_application()
+from django.core.wsgi import get_wsgi_application
+
+# Get the WSGI application
+app = get_wsgi_application()
 
 # Vercel handler
-def handler(request):
-    return application(request)
+async def handler(request):
+    """Handle incoming requests from Vercel"""
+    return app(request)
