@@ -33,7 +33,8 @@ ALLOWED_HOSTS = [
     'wasteclassifier.vercel.app',
     'localhost',
     '127.0.0.1',
-    '.vercel.app'
+    '.vercel.app',
+    '*'  # Allow all hosts for now - restrict in production
 ]
 
 
