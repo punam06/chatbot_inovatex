@@ -1,14 +1,19 @@
 {
-  "buildCommand": "pip install -r requirements.txt",
-  "outputDirectory": ".",
+  "buildCommand": "pip install -r requirements.txt && python manage.py collectstatic --noinput",
+  "outputDirectory": "staticfiles",
   "rewrites": [
+    {
+      "source": "/static/(.*)",
+      "destination": "/static/$1"
+    },
     {
       "source": "/(.*)",
       "destination": "/api"
     }
   ],
   "env": {
-    "PYTHONUNBUFFERED": "1"
+    "PYTHONUNBUFFERED": "1",
+    "DJANGO_SETTINGS_MODULE": "wasteclassifier.settings"
   },
   "functions": {
     "api/index.py": {
