@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Waste Classifier{% endblock %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=1">
+    <style>
+        /* Inline critical styles */
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background-color: #4CAF50;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+        main {
+            padding: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Waste Classification App</h1>
+    </header>
+    <main>
+        {% block content %}
+        {% endblock %}
+    </main>
+    <footer>
+        <p>&copy; 2025 Waste Classifier</p>
+    </footer>
+    <script>
+        console.log("Base template script tag loaded");
+    </script>
+    <script src="{% static 'js/script.js' %}?v=1"></script>
+    <script>
+        console.log("Script.js should be loaded now");
+    </script>
+</body>
+</html>

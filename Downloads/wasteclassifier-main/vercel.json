@@ -4,17 +4,9 @@
       "src": "api/index.py",
       "use": "@vercel/python",
       "config": { "maxLambdaSize": "15mb", "runtime": "python3.9" }
-    },
-    {
-      "src": "wasteclassifier/static",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
-    {
-      "src": "/static/(.*)",
-      "dest": "wasteclassifier/static/$1"
-    },
     {
       "src": "/(.*)",
       "dest": "api/index.py"
