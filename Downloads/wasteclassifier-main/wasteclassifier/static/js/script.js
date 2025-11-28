@@ -9,72 +9,110 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let stream = null;
 
-    // Access the webcam
+    // Access the webcam with better error handling
     async function initWebcam() {
         try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            // Request camera with specific constraints
+            const constraints = {
+                video: {
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
+                    facingMode: 'user'
+                },
+                audio: false
+            };
+            
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
             video.srcObject = stream;
-            console.log("Webcam access granted.");
-            // Ensure video is visible initially
+            video.onloadedmetadata = () => {
+                video.play();
+                console.log("Webcam access granted and playing.");
+            };
             video.style.display = 'block';
             capturedImage.style.display = 'none';
+            captureButton.disabled = false;
+            classificationResult.textContent = '';
         } catch (err) {
             console.error("Error accessing webcam: ", err);
-            classificationResult.textContent = 'Error accessing webcam. Please ensure permissions are granted.';
+            let errorMsg = 'Error accessing webcam. ';
+            if (err.name === 'NotAllowedError') {
+                errorMsg += 'Permission denied. Please allow camera access.';
+            } else if (err.name === 'NotFoundError') {
+                errorMsg += 'No camera found on this device.';
+            } else if (err.name === 'NotReadableError') {
+                errorMsg += 'Camera is already in use by another application.';
+            } else {
+                errorMsg += err.message;
+            }
+            classificationResult.textContent = errorMsg;
+            captureButton.disabled = true;
         }
     }
 
     // Capture image from webcam
-    captureButton.addEventListener('click', () => {
-        if (!stream) {
+    captureButton.addEventListener('click', async () => {
+        if (!stream || !video.srcObject) {
             console.error("Webcam stream not available.");
-            classificationResult.textContent = 'Webcam not available.';
+            classificationResult.textContent = 'Webcam not available. Please refresh and allow camera access.';
             return;
         }
 
-        // Draw the current video frame onto the canvas
-        const context = canvas.getContext('2d');
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        try {
+            // Wait for video to be ready
+            if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+                console.warn("Video not ready yet");
+                classificationResult.textContent = 'Webcam loading... Please wait.';
+                return;
+            }
 
-        // Get the image data from the canvas
-        const imageDataUrl = canvas.toDataURL('image/png');
+            // Draw the current video frame onto the canvas
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Display the captured image (optional)
-        capturedImage.src = imageDataUrl;
-        capturedImage.style.display = 'block';
-        video.style.display = 'none'; // Hide video feed after capture
+            // Get the image data from the canvas
+            const imageDataUrl = canvas.toDataURL('image/png');
 
-        console.log("Image captured. Sending to backend...");
-        classificationResult.textContent = 'Analyzing... Please wait.';
-        detailsResult.textContent = '';
+            // Display the captured image
+            capturedImage.src = imageDataUrl;
+            capturedImage.style.display = 'block';
+            video.style.display = 'none';
 
-        // Send image data to the backend
-        sendImageToBackend(imageDataUrl);
+            console.log("Image captured. Sending to backend...");
+            classificationResult.textContent = 'Analyzing... Please wait.';
+            detailsResult.textContent = '';
+
+            // Send image data to the backend
+            await sendImageToBackend(imageDataUrl);
+        } catch (error) {
+            console.error('Error during capture:', error);
+            classificationResult.textContent = 'Capture failed: ' + error.message;
+        }
     });
 
     // Function to send image data to the backend
     async function sendImageToBackend(imageDataUrl) {
         try {
             const analyzeUrl = window.location.origin + '/analyze/';
-            const response = await fetch(analyzeUrl, { // Use the correct endpoint
+            console.log("Sending to:", analyzeUrl);
+            
+            const response = await fetch(analyzeUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    // 'X-CSRFToken': getCookie('csrftoken') // Uncomment if CSRF protection is enabled on the view
                 },
                 body: JSON.stringify({ image_data: imageDataUrl })
             });
 
+            console.log("Response status:", response.status);
+
             if (!response.ok) {
-                // Handle HTTP errors (e.g., 400, 500)
-                const errorData = await response.json().catch(() => ({ error: 'Unknown server error' })); // Try to parse error, fallback
+                const errorData = await response.json().catch(() => ({ error: 'Unknown server error' }));
                 throw new Error(`Server error: ${response.status} ${response.statusText}. ${errorData.error || ''}`);
             }
 
             const data = await response.json();
 
             if (data.error) {
-                // Handle application-level errors returned in JSON
                 throw new Error(data.error);
             }
 
@@ -86,27 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error sending image or processing response:', error);
             classificationResult.textContent = 'Analysis failed.';
             detailsResult.textContent = `Error: ${error.message}`;
-        } finally {
-            // Optionally re-enable the capture button or reset the view
-            // video.style.display = 'block'; // Show video again
-            // capturedImage.style.display = 'none';
         }
-    }
-
-    // Helper function to get CSRF token (needed for POST requests in Django)
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
     }
 
     // Initialize webcam on page load
